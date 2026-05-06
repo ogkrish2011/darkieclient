@@ -7,6 +7,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 import java.lang.reflect.Array;
+import net.minecraft.client.network.NetHandlerPlayClient;
 import net.minecraft.network.INetHandler;
 import net.minecraft.network.NetworkManager;
 import net.minecraft.network.Packet;
@@ -77,13 +78,21 @@ public abstract class MixinNetworkManager {
     @SuppressWarnings("unchecked")
     private void lionclient$interceptInbound(ChannelHandlerContext context, Packet<?> packet, CallbackInfo callbackInfo) {
         LionClient client = LionClient.getInstance();
-        if (client != null) {
+        INetHandler listener = packetListener;
+        if (client != null && listener instanceof NetHandlerPlayClient) {
             KnockbackDelayModule knockbackDelayModule = client.getModuleManager().getModule(KnockbackDelayModule.class);
             if (knockbackDelayModule != null
-                && knockbackDelayModule.isEnabled()
-                && !knockbackDelayModule.isHolding()
-                && packet instanceof S12PacketEntityVelocity) {
-                knockbackDelayModule.tryTriggerVelocity((S12PacketEntityVelocity) packet);
+                    && knockbackDelayModule.isEnabled()
+                    && !knockbackDelayModule.isHolding()
+                    && packet instanceof S12PacketEntityVelocity) {
+                S12PacketEntityVelocity motionPacket = (S12PacketEntityVelocity) packet;
+                if (KnockbackDelayModule.cachedPlayerId != -1
+                        && motionPacket.getEntityID() == KnockbackDelayModule.cachedPlayerId) {
+                    int chance = knockbackDelayModule.getChance().getValue();
+                    if (chance >= 100 || (int) (Math.random() * 100) < chance) {
+                        knockbackDelayModule.triggerDelay(KnockbackDelayModule.cachedOnGround);
+                    }
+                }
             }
 
             if (client.getKnockbackDelayBuffer().shouldBufferIncoming()) {
@@ -92,9 +101,9 @@ public abstract class MixinNetworkManager {
                 client.getKnockbackDelayBuffer().bufferIncoming(new Runnable() {
                     @Override
                     public void run() {
-                        typedPacket.processPacket(packetListener);
+                        typedPacket.processPacket(listener);
                     }
-                }, knockbackDelayModule == null ? 0 : knockbackDelayModule.getRemainingHoldMillis());
+                });
                 return;
             }
         }

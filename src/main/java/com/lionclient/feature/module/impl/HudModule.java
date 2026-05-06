@@ -147,7 +147,8 @@ public final class HudModule extends Module {
             if (!module.isEnabled() || module == this) {
                 continue;
             }
-            moduleNames.add(module.getName());
+            String hudInfo = module.getHudInfo();
+            moduleNames.add(hudInfo == null || hudInfo.isEmpty() ? module.getName() : module.getName() + " " + hudInfo);
         }
 
         sortByWidth(moduleNames);

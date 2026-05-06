@@ -9,6 +9,7 @@ import com.lionclient.feature.setting.ActionSetting;
 import com.lionclient.feature.setting.BooleanSetting;
 import com.lionclient.feature.setting.DecimalSetting;
 import com.lionclient.feature.setting.EnumSetting;
+import com.lionclient.feature.setting.IntRangeSetting;
 import com.lionclient.feature.setting.NumberSetting;
 import com.lionclient.feature.setting.Setting;
 import java.io.IOException;
@@ -90,6 +91,7 @@ public final class ModernClickGuiScreen extends GuiScreen {
     private Module bindingModule;
     private EnumSetting<?> expandedEnumSetting;
     private Setting draggingSetting;
+    private boolean draggingRangeHigh;
     private Setting editingValueSetting;
     private GuiTextField valueEditor;
     private Integer windowX;
@@ -234,8 +236,11 @@ public final class ModernClickGuiScreen extends GuiScreen {
             normalizeNumberRanges(selectedModule);
         } else if (draggingSetting instanceof DecimalSetting) {
             ((DecimalSetting) draggingSetting).setValue(((DecimalSetting) draggingSetting).getValue(), true);
+        } else if (draggingSetting instanceof IntRangeSetting) {
+            ((IntRangeSetting) draggingSetting).saveValue();
         }
         draggingSetting = null;
+        draggingRangeHigh = false;
     }
 
     @Override
@@ -310,6 +315,7 @@ public final class ModernClickGuiScreen extends GuiScreen {
         super.onGuiClosed();
         draggingWindow = false;
         draggingSetting = null;
+        draggingRangeHigh = false;
         bindingModule = null;
         expandedEnumSetting = null;
     }
@@ -434,6 +440,18 @@ public final class ModernClickGuiScreen extends GuiScreen {
                     ((ActionSetting) setting).run();
                     ensureSelection();
                     return true;
+                }
+
+                if (setting instanceof IntRangeSetting && mouseButton == 0) {
+                    Bounds sliderBounds = getSliderBounds(rowBounds);
+                    if (sliderBounds.contains(mouseX, mouseY) || rowBounds.contains(mouseX, mouseY)) {
+                        expandedEnumSetting = null;
+                        clearValueEditor();
+                        draggingSetting = setting;
+                        draggingRangeHigh = chooseRangeSliderHandle((IntRangeSetting) setting, mouseX, sliderBounds);
+                        applyRangeSliderValue((IntRangeSetting) setting, mouseX, sliderBounds, draggingRangeHigh, false);
+                        return true;
+                    }
                 }
 
                 if ((setting instanceof NumberSetting || setting instanceof DecimalSetting) && mouseButton == 0) {
@@ -716,6 +734,43 @@ public final class ModernClickGuiScreen extends GuiScreen {
             return;
         }
 
+        if (setting instanceof IntRangeSetting) {
+            IntRangeSetting range = (IntRangeSetting) setting;
+            Bounds sliderBounds = getSliderBounds(rowBounds);
+            Bounds valueBounds = getValueInputBounds(rowBounds);
+            if (draggingSetting == setting) {
+                applyRangeSliderValue(range, mouseX, sliderBounds, draggingRangeHigh, false);
+            }
+
+            String valueText = setting.getValueText();
+            boolean valueHovered = valueBounds.contains(mouseX, mouseY);
+            this.fontRendererObj.drawString(setting.getName(), rowBounds.left + CONTROL_PADDING, rowBounds.top + 8, scaleAlpha(TEXT_PRIMARY, alphaScale));
+            drawRoundedRect(
+                valueBounds.left,
+                valueBounds.top,
+                valueBounds.right,
+                valueBounds.bottom,
+                4.0F,
+                scaleAlpha(withAlpha(CONTROL_BACKGROUND, valueHovered ? 224 : 204), alphaScale)
+            );
+            drawRoundedOutline(
+                valueBounds.left,
+                valueBounds.top,
+                valueBounds.right,
+                valueBounds.bottom,
+                4.0F,
+                scaleAlpha(withAlpha(valueHovered ? CONTROL_BORDER_LIGHT : CONTROL_BORDER, 255), alphaScale)
+            );
+            this.fontRendererObj.drawString(
+                valueText,
+                valueBounds.right - 6 - this.fontRendererObj.getStringWidth(valueText),
+                valueBounds.top + (valueBounds.getHeight() - this.fontRendererObj.FONT_HEIGHT) / 2,
+                scaleAlpha(accent, alphaScale)
+            );
+            drawRangeSlider(range, sliderBounds, accent, alphaScale);
+            return;
+        }
+
         if (setting instanceof NumberSetting || setting instanceof DecimalSetting) {
             Bounds sliderBounds = getSliderBounds(rowBounds);
             Bounds valueBounds = getValueInputBounds(rowBounds);
@@ -918,6 +973,37 @@ public final class ModernClickGuiScreen extends GuiScreen {
         expandedEnumSetting = null;
     }
 
+    private boolean chooseRangeSliderHandle(IntRangeSetting setting, int mouseX, Bounds sliderBounds) {
+        float progress = clamp((mouseX - sliderBounds.left) / (float) sliderBounds.getWidth(), 0.0F, 1.0F);
+        float clickValue = setting.getMin() + progress * (setting.getMax() - setting.getMin());
+        return clickValue >= (setting.getLow() + setting.getHigh()) / 2.0F;
+    }
+
+    private void applyRangeSliderValue(IntRangeSetting setting, int mouseX, Bounds sliderBounds, boolean highHandle, boolean save) {
+        float progress = clamp((mouseX - sliderBounds.left) / (float) sliderBounds.getWidth(), 0.0F, 1.0F);
+        int value = setting.getMin() + Math.round(progress * (setting.getMax() - setting.getMin()));
+        if (highHandle) {
+            setting.setHigh(value, save);
+        } else {
+            setting.setLow(value, save);
+        }
+    }
+
+    private void drawRangeSlider(IntRangeSetting setting, Bounds sliderBounds, int accent, float alphaScale) {
+        int range = setting.getMax() - setting.getMin();
+        float lowProgress = range == 0 ? 0.0F : clamp((setting.getLow() - setting.getMin()) / (float) range, 0.0F, 1.0F);
+        float highProgress = range == 0 ? 0.0F : clamp((setting.getHigh() - setting.getMin()) / (float) range, 0.0F, 1.0F);
+        int lowX = sliderBounds.left + Math.round(sliderBounds.getWidth() * lowProgress);
+        int highX = sliderBounds.left + Math.round(sliderBounds.getWidth() * highProgress);
+
+        Gui.drawRect(sliderBounds.left, sliderBounds.top, sliderBounds.right, sliderBounds.bottom, scaleAlpha(0xFF000000 | CONTROL_BORDER, alphaScale));
+        if (highX > lowX) {
+            Gui.drawRect(lowX, sliderBounds.top, highX, sliderBounds.bottom, scaleAlpha(withAlpha(accent, 205), alphaScale));
+        }
+        Gui.drawRect(lowX, sliderBounds.top - 2, lowX + 2, sliderBounds.bottom + 2, scaleAlpha(TEXT_PRIMARY, alphaScale));
+        Gui.drawRect(highX - 1, sliderBounds.top - 2, highX + 1, sliderBounds.bottom + 2, scaleAlpha(TEXT_PRIMARY, alphaScale));
+    }
+
     private void applySliderValue(Setting setting, int mouseX, Bounds sliderBounds, boolean save) {
         float progress = clamp((mouseX - sliderBounds.left) / (float) sliderBounds.getWidth(), 0.0F, 1.0F);
         if (setting instanceof NumberSetting) {
@@ -996,7 +1082,7 @@ public final class ModernClickGuiScreen extends GuiScreen {
         if (setting instanceof EnumSetting || setting instanceof ActionSetting) {
             return 44;
         }
-        if (setting instanceof NumberSetting || setting instanceof DecimalSetting) {
+        if (setting instanceof IntRangeSetting || setting instanceof NumberSetting || setting instanceof DecimalSetting) {
             return 44;
         }
         return 34;

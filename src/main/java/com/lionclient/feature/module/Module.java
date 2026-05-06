@@ -75,6 +75,14 @@ public abstract class Module {
         return enabled;
     }
 
+    public String getHudInfo() {
+        return "";
+    }
+
+    public int getHudInfoColor() {
+        return 0xFFAAAAAA;
+    }
+
     public void toggle() {
         setEnabled(!enabled);
     }

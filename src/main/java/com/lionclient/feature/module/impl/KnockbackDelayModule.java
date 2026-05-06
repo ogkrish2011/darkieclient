@@ -3,43 +3,28 @@ package com.lionclient.feature.module.impl;
 import com.lionclient.LionClient;
 import com.lionclient.feature.module.Category;
 import com.lionclient.feature.module.Module;
-import com.lionclient.feature.setting.BooleanSetting;
+import com.lionclient.feature.setting.IntRangeSetting;
 import com.lionclient.feature.setting.NumberSetting;
-import java.util.Random;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.ScaledResolution;
-import net.minecraft.network.play.server.S12PacketEntityVelocity;
-import net.minecraftforge.client.event.RenderGameOverlayEvent;
 import org.lwjgl.input.Keyboard;
 
 public final class KnockbackDelayModule extends Module {
-    private final NumberSetting minDelay = new NumberSetting("Min Delay", 0, 5000, 10, 1900);
-    private final NumberSetting maxDelay = new NumberSetting("Max Delay", 0, 5000, 10, 2100);
-    private final NumberSetting chance = new NumberSetting("Chance", 0, 100, 1, 100);
-    private final BooleanSetting renderIndicator = new BooleanSetting("Render Indicator", false);
+    private final IntRangeSetting airDelay = new IntRangeSetting("delay (ms)", 300, 200, 0, 1000);
+    private final NumberSetting chance = new NumberSetting("chance %", 0, 100, 1, 100);
 
-    private final Random random = new Random();
-
-    private volatile long holdPacketsUntil;
-    private volatile int cachedPlayerId;
+    public static volatile long holdPacketsUntil = 0L;
+    public static volatile int cachedPlayerId = -1;
+    public static volatile boolean cachedOnGround = false;
 
     public KnockbackDelayModule() {
-        super("KnockbackDelay", "Buffers all incoming packets when your velocity packet is received.", Category.COMBAT, Keyboard.KEY_NONE);
-        addSetting(minDelay);
-        addSetting(maxDelay);
+        super("Knockback Delay", "Buffers all incoming packets when hit, freezing the world until the delay expires", Category.COMBAT, Keyboard.KEY_NONE);
+        addSetting(airDelay);
         addSetting(chance);
-        addSetting(renderIndicator);
-    }
-
-    @Override
-    protected void onEnable() {
-        resetState(false);
     }
 
     @Override
     protected void onDisable() {
         holdPacketsUntil = 0L;
-        cachedPlayerId = 0;
 
         LionClient client = LionClient.getInstance();
         if (client != null) {
@@ -50,70 +35,50 @@ public final class KnockbackDelayModule extends Module {
     @Override
     public void onClientTick() {
         Minecraft minecraft = Minecraft.getMinecraft();
-        if (minecraft.thePlayer == null || minecraft.theWorld == null || minecraft.thePlayer.isDead) {
-            resetState(true);
+        if (minecraft.thePlayer == null) {
             return;
         }
 
         cachedPlayerId = minecraft.thePlayer.getEntityId();
-        if (getRemainingHoldMillis() <= 0) {
-            holdPacketsUntil = 0L;
-        }
+        cachedOnGround = minecraft.thePlayer.onGround;
     }
 
-    @Override
-    public void onRenderOverlay(RenderGameOverlayEvent.Text event) {
-        if (!renderIndicator.isEnabled()) {
+    public void triggerDelay(boolean onGround) {
+        if (System.currentTimeMillis() < holdPacketsUntil) {
             return;
         }
 
-        Minecraft minecraft = Minecraft.getMinecraft();
-        if (minecraft.fontRendererObj == null || minecraft.gameSettings.showDebugInfo) {
-            return;
-        }
-
-        int remaining = getRemainingHoldMillis();
-        if (remaining <= 0) {
-            return;
-        }
-
-        ScaledResolution resolution = event.resolution;
-        String text = "Delaying packets: " + remaining + "ms";
-        int x = (resolution.getScaledWidth() - minecraft.fontRendererObj.getStringWidth(text)) / 2;
-        int y = resolution.getScaledHeight() / 2 + 18;
-        minecraft.fontRendererObj.drawStringWithShadow(text, x, y, 0xFFFF5050);
-    }
-
-    public void tryTriggerVelocity(S12PacketEntityVelocity velocityPacket) {
-        if (isHolding() || cachedPlayerId == 0 || velocityPacket.getEntityID() != cachedPlayerId) {
-            return;
-        }
-
-        int configuredChance = chance.getValue();
-        if (configuredChance < 100 && random.nextInt(100) >= configuredChance) {
-            return;
-        }
-
-        int low = Math.min(minDelay.getValue(), maxDelay.getValue());
-        int high = Math.max(minDelay.getValue(), maxDelay.getValue());
-        int holdMillis = high > low ? low + random.nextInt(high - low + 1) : low;
-        if (holdMillis <= 0) {
-            return;
-        }
-
-        holdPacketsUntil = System.currentTimeMillis() + holdMillis;
+        int low = airDelay.getLow();
+        int high = airDelay.getHigh();
+        long delayMs = high > low ? low + (long) (Math.random() * (high - low + 1)) : (long) low;
+        holdPacketsUntil = System.currentTimeMillis() + delayMs;
     }
 
     public boolean isHolding() {
-        return getRemainingHoldMillis() > 0;
+        return isEnabled() && System.currentTimeMillis() < holdPacketsUntil;
     }
 
-    public int getRemainingHoldMillis() {
-        return (int) Math.max(0L, holdPacketsUntil - System.currentTimeMillis());
+    public NumberSetting getChance() {
+        return chance;
     }
 
-    private void resetState(boolean unused) {
-        holdPacketsUntil = 0L;
-        cachedPlayerId = 0;
+    public IntRangeSetting getAirDelay() {
+        return airDelay;
+    }
+
+    @Override
+    public String getHudInfo() {
+        if (isHolding()) {
+            return "Holding";
+        }
+
+        int low = airDelay.getLow();
+        int high = airDelay.getHigh();
+        return high > low ? low + "-" + high + "ms" : low + "ms";
+    }
+
+    @Override
+    public int getHudInfoColor() {
+        return isHolding() ? 0xFFFF5050 : super.getHudInfoColor();
     }
 }

@@ -2,25 +2,21 @@ package com.lionclient.network;
 
 import com.lionclient.LionClient;
 import com.lionclient.feature.module.impl.KnockbackDelayModule;
-import java.util.ArrayDeque;
-import java.util.Queue;
-import net.minecraft.network.INetHandler;
-import net.minecraft.network.Packet;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import net.minecraft.client.Minecraft;
 
 public final class KnockbackDelayBuffer {
     private static final int MAX_RELEASES_PER_TICK = 50;
 
-    private final Queue<QueuedPacket> incomingQueue = new ArrayDeque<QueuedPacket>();
-    private long lastIncomingDeliveryMs;
-    private boolean flushingIncoming;
+    private final ConcurrentLinkedQueue<QueuedPacket> incomingQueue = new ConcurrentLinkedQueue<QueuedPacket>();
+    private volatile long lastIncomingDeliveryMs;
+    private volatile boolean flushingIncoming;
+
+    public int getIncomingQueueSize() {
+        return incomingQueue.size();
+    }
 
     public void onClientTick() {
-        KnockbackDelayModule module = getModule();
-        if (module == null) {
-            flushAllIncoming();
-            return;
-        }
-
         long now = System.currentTimeMillis();
         flushingIncoming = true;
         try {
@@ -46,7 +42,7 @@ public final class KnockbackDelayBuffer {
             flushingIncoming = false;
         }
 
-        if (incomingQueue.isEmpty() && !shouldBufferIncoming(module)) {
+        if (incomingQueue.isEmpty() && !shouldBufferIncoming()) {
             lastIncomingDeliveryMs = 0L;
         }
     }
@@ -71,33 +67,28 @@ public final class KnockbackDelayBuffer {
         }
     }
 
-    private boolean shouldBufferIncoming(KnockbackDelayModule module) {
+    public boolean shouldBufferIncoming() {
         if (flushingIncoming) {
             return false;
         }
 
-        if (module == null || !module.isEnabled()) {
+        if (Minecraft.getMinecraft().theWorld == null) {
+            return false;
+        }
+
+        KnockbackDelayModule module = getModule();
+        boolean knockback = module != null && module.isEnabled() && module.isHolding();
+        if (!knockback) {
             if (!incomingQueue.isEmpty()) {
                 flushAllIncoming();
             }
             return false;
         }
 
-        if (!module.isHolding()) {
-            if (!incomingQueue.isEmpty()) {
-                flushAllIncoming();
-            }
-            return false;
-        }
-
-        return module.isEnabled() && module.isHolding();
+        return true;
     }
 
-    public boolean shouldBufferIncoming() {
-        return shouldBufferIncoming(getModule());
-    }
-
-    public void bufferIncoming(Runnable action, int delayMs) {
+    public void bufferIncoming(Runnable action) {
         if (flushingIncoming) {
             try {
                 action.run();
@@ -107,20 +98,20 @@ public final class KnockbackDelayBuffer {
         }
 
         long now = System.currentTimeMillis();
-        long deliverAt = Math.max(now + Math.max(0, delayMs), lastIncomingDeliveryMs);
+        long delayMs = 0L;
+
+        KnockbackDelayModule module = getModule();
+        if (module != null && module.isEnabled() && module.isHolding()) {
+            long delay = KnockbackDelayModule.holdPacketsUntil - now;
+            if (delay > delayMs) {
+                delayMs = delay;
+            }
+        }
+
+        boolean active = delayMs > 0L;
+        long deliverAt = active ? Math.max(now + delayMs, lastIncomingDeliveryMs) : Math.max(now, lastIncomingDeliveryMs);
         lastIncomingDeliveryMs = deliverAt;
         incomingQueue.offer(new QueuedPacket(deliverAt, action));
-    }
-
-    @SuppressWarnings("unchecked")
-    private Runnable createAction(final Packet<?> packet, final INetHandler listener) {
-        final Packet<INetHandler> typedPacket = (Packet<INetHandler>) packet;
-        return new Runnable() {
-            @Override
-            public void run() {
-                typedPacket.processPacket(listener);
-            }
-        };
     }
 
     private KnockbackDelayModule getModule() {

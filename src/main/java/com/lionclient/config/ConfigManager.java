@@ -2,9 +2,11 @@ package com.lionclient.config;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.google.gson.JsonPrimitive;
 import com.lionclient.feature.module.Module;
 import com.lionclient.feature.module.ModuleManager;
 import com.lionclient.feature.module.impl.ClickPatternStore;
@@ -12,6 +14,7 @@ import com.lionclient.feature.setting.ActionSetting;
 import com.lionclient.feature.setting.BooleanSetting;
 import com.lionclient.feature.setting.DecimalSetting;
 import com.lionclient.feature.setting.EnumSetting;
+import com.lionclient.feature.setting.IntRangeSetting;
 import com.lionclient.feature.setting.NumberSetting;
 import com.lionclient.feature.setting.Setting;
 import java.awt.Desktop;
@@ -171,6 +174,11 @@ public final class ConfigManager {
                         ((BooleanSetting) setting).setEnabled(value.getAsBoolean());
                     } else if (setting instanceof DecimalSetting) {
                         ((DecimalSetting) setting).setManualValue(value.getAsDouble());
+                    } else if (setting instanceof IntRangeSetting && value.isJsonArray()) {
+                        JsonArray array = value.getAsJsonArray();
+                        if (array.size() >= 2) {
+                            ((IntRangeSetting) setting).setRange(array.get(0).getAsInt(), array.get(1).getAsInt(), false);
+                        }
                     } else if (setting instanceof NumberSetting) {
                         ((NumberSetting) setting).setManualValue(value.getAsInt());
                     } else if (setting instanceof EnumSetting) {
@@ -219,6 +227,12 @@ public final class ConfigManager {
                     settingsJson.addProperty(setting.getName(), ((BooleanSetting) setting).isEnabled());
                 } else if (setting instanceof DecimalSetting) {
                     settingsJson.addProperty(setting.getName(), ((DecimalSetting) setting).getValue());
+                } else if (setting instanceof IntRangeSetting) {
+                    IntRangeSetting range = (IntRangeSetting) setting;
+                    JsonArray array = new JsonArray();
+                    array.add(new JsonPrimitive(range.getLow()));
+                    array.add(new JsonPrimitive(range.getHigh()));
+                    settingsJson.add(setting.getName(), array);
                 } else if (setting instanceof NumberSetting) {
                     settingsJson.addProperty(setting.getName(), ((NumberSetting) setting).getValue());
                 } else if (setting instanceof EnumSetting) {

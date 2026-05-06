@@ -9,6 +9,7 @@ import com.lionclient.feature.setting.ActionSetting;
 import com.lionclient.feature.setting.BooleanSetting;
 import com.lionclient.feature.setting.DecimalSetting;
 import com.lionclient.feature.setting.EnumSetting;
+import com.lionclient.feature.setting.IntRangeSetting;
 import com.lionclient.feature.setting.NumberSetting;
 import com.lionclient.feature.setting.Setting;
 import java.io.IOException;
@@ -278,6 +279,25 @@ public final class ClickGuiScreen extends GuiScreen {
 
             if (setting instanceof BooleanSetting && mouseButton == 0) {
                 ((BooleanSetting) setting).toggle();
+                return;
+            }
+
+            if (setting instanceof IntRangeSetting) {
+                IntRangeSetting range = (IntRangeSetting) setting;
+                boolean shift = Keyboard.isKeyDown(Keyboard.KEY_LSHIFT) || Keyboard.isKeyDown(Keyboard.KEY_RSHIFT);
+                if (mouseButton == 0) {
+                    if (shift) {
+                        range.incrementLow();
+                    } else {
+                        range.incrementHigh();
+                    }
+                } else if (mouseButton == 1) {
+                    if (shift) {
+                        range.decrementLow();
+                    } else {
+                        range.decrementHigh();
+                    }
+                }
                 return;
             }
 
