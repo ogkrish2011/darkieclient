@@ -6,7 +6,6 @@ import com.lionclient.feature.module.impl.AutoClickerModule;
 import com.lionclient.feature.module.impl.AntiBotModule;
 import com.lionclient.feature.module.impl.AntiFireballModule;
 import com.lionclient.feature.module.impl.BedPlatesModule;
-import com.lionclient.feature.module.impl.BacktrackModule;
 import com.lionclient.feature.module.impl.ClickGuiModule;
 import com.lionclient.feature.module.impl.ClickRecorderModule;
 import com.lionclient.feature.module.impl.ConfigModule;
@@ -53,7 +52,6 @@ public final class ModuleManager {
         register(new AntiFireballModule());
         register(new AimAssistModule());
         register(new KillAuraModule());
-        register(new BacktrackModule());
         register(new KnockbackDelayModule());
         register(ClutchModule.getInstance());
         register(new ClickRecorderModule());
