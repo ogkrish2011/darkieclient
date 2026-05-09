@@ -1,3 +1,13 @@
+# Darkie Client
+The ultimate optimized Minecraft 1.8.9 experience.
+
+## Features
+- Redesigned Modern GUI with Blue/Light Blue Gradient theme.
+- Smooth animations and transitions.
+- Performance optimizations (Fast Render, Smooth FPS).
+- New modules: AutoArmor, FullBright, Performance.
+- Completely renamed and rebranded.
+
 Free client
 Do not DM for support
 Support can be asked for here: https://discord.gg/wN56evs92R

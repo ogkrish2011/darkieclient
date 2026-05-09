@@ -25,8 +25,8 @@ apply plugin: "net.minecraftforge.gradle.forge"
 apply plugin: "org.spongepowered.mixin"
 
 version = "1.1.0"
-group = "com.lionclient"
-archivesBaseName = "LionClient"
+group = "com.darkieclient"
+archivesBaseName = "DarkieClient"
 
 sourceCompatibility = targetCompatibility = "1.8"
 
@@ -35,8 +35,8 @@ minecraft {
     runDir = "run"
     mappings = "stable_22"
     makeObfSourceJar = false
-    clientRunArgs += ["--tweakClass", "org.spongepowered.asm.launch.MixinTweaker", "--mixin", "mixins.lionclient.json"]
-    serverRunArgs += ["--tweakClass", "org.spongepowered.asm.launch.MixinTweaker", "--mixin", "mixins.lionclient.json"]
+    clientRunArgs += ["--tweakClass", "org.spongepowered.asm.launch.MixinTweaker", "--mixin", "mixins.darkieclient.json"]
+    serverRunArgs += ["--tweakClass", "org.spongepowered.asm.launch.MixinTweaker", "--mixin", "mixins.darkieclient.json"]
 }
 
 repositories {
@@ -77,7 +77,7 @@ processResources {
 
 sourceSets {
     main {
-        ext.refMap = "mixins.lionclient.refmap.json"
+        ext.refMap = "mixins.darkieclient.refmap.json"
     }
 }
 
@@ -88,11 +88,11 @@ jar {
     }
 
     manifest.attributes(
-        "FMLCorePlugin": "com.lionclient.mixin.MixinLoader",
+        "FMLCorePlugin": "com.darkieclient.mixin.MixinLoader",
         "ForceLoadAsMod": true,
         "FMLCorePluginContainsFMLMod": true,
         "TweakClass": "org.spongepowered.asm.launch.MixinTweaker",
         "TweakOrder": 0,
-        "MixinConfigs": "mixins.lionclient.json"
+        "MixinConfigs": "mixins.darkieclient.json"
     )
 }

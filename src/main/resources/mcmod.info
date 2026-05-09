@@ -1,8 +1,8 @@
 [
   {
-    "modid": "CleanKeyStrokes",
-    "name": "CleanKeyStrokes",
-    "description": "Clean Keystrokes",
+    "modid": "darkieclient",
+    "name": "Darkie Client",
+    "description": "Darkie Client - Optimized Minecraft Experience",
     "version": "${version}",
     "mcversion": "${mcversion}",
     "url": "",

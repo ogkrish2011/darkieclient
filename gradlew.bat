@@ -1,3 +1,7 @@
+@rem Set JAVA_HOME to the Java 8 path for this project
+set "JAVA_HOME=C:\Program Files\Eclipse Adoptium\jdk-8.0.482.8-hotspot"
+set "PATH=%JAVA_HOME%\bin;%PATH%"
+
 @if "%DEBUG%" == "" @echo off
 @rem ##########################################################################
 @rem
